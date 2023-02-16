@@ -1,46 +1,41 @@
-import { Socket as ISocket } from 'net'
+import { Xbox } from './Xbox'
  
-class Socket {
-  private readonly socket: ISocket
+class xbdm {
+  public readonly consoles: Map<string, Xbox>
 
   public constructor() {
-    this.socket = new ISocket()
-    this.socket.setNoDelay(true)
-    this.socket.setKeepAlive(true)
+    this.consoles = new Map<string, Xbox>()
   }
 
-  public connect(): void {
-    this.socket.connect({
-      host: "192.168.1.118",
-      port: 730,
-    }, (data?) => {
-      console.log(data)
+  public connect(ip = 'jtag', callback?: (connceted: boolean) => void): Xbox {
+    const console = new Xbox(this, ip)
+    console.connect((connected) => {
+      if (connected) {
+        this.consoles.set(console.runtimeId, console)
+        if (callback) return callback(true)
+      } else {
+        if (callback) return callback(false)
+      }
     })
-  }
 
-  public sendCommand(command: string): boolean {
-    return this.socket.write(command + "\r\n")
-  }
-
-  public xNotify(message: string): void {
-    let command =
-      "consolefeatures ver=2" +
-      ' type=12 params="A\\0\\A\\2\\' +
-      2 +
-      "/" +
-      message.length +
-      "\\" +
-      Buffer.from(message, "utf8").toString("hex") +
-      "\\" +
-      1 +
-      "\\";
-      command += '0\\"';
-      this.sendCommand(command)
+    return console
   }
 }
 
-let sk = new Socket()
-sk.connect()
-setTimeout(() => {
-  sk.xNotify("Hello World!");
-}, 10000)
+export {
+  xbdm,
+}
+
+const xd = new xbdm()
+const xbox = xd.connect("192.168.1.118", (connected) => {
+  if (!connected) return
+  // xbox.xNotify("Hello World!!!!")
+  xbox.commands.executeCommand('getconsoleid', (data) => {
+    console.log(data)
+  })
+  setTimeout((res) => {
+    xbox.commands.executeCommand('getconsoleid', (data) => {
+      console.log(data)
+    })
+  }, 10000)
+})
