@@ -1,28 +1,29 @@
 import type { xbdm } from '../index'
+import type { CommandsHandler } from './handlers/Commands'
+import type { CommandResponse } from '../types'
 
 import { Socket } from 'net'
+import { EventEmitter } from 'events'
 import { genUuid } from '../utils'
-import { CommandHandler } from './handlers/index'
+import AbstractHandler from './handlers/AbstractHandler'
+import { defaultHandlers } from './handlers'
 
-class Xbox {
+class Xbox extends EventEmitter {
   public readonly socket: Socket
   public readonly xbdm: xbdm
   public readonly ip: string
   public readonly runtimeId: string
-
-  // Handlers
-  public readonly commands: CommandHandler
+  public readonly handlers: Map<string, AbstractHandler>
 
   public constructor(xbdm: xbdm, ip: string) {
+    super()
+    this.socket = new Socket()
     this.xbdm = xbdm
     this.ip = ip
     this.runtimeId = genUuid()
-    this.socket = new Socket()
+    this.handlers = new Map()
     this.socket.setNoDelay(true)
     this.socket.setKeepAlive(true)
-
-    // Handlers
-    this.commands = new CommandHandler(this)
   }
 
   public connect(callback: (connected?: boolean) => void): void {
@@ -30,6 +31,13 @@ class Xbox {
         host: this.ip,
         port: 730,
       }, (data?) => {
+        if (data === undefined) {
+          this.socket.once('data', () => {
+            this.loadHandlers()
+            this.emit('Connected')
+          })
+        }
+
         if (data === undefined && callback) return callback(true)
   
         if (callback) return callback(false)
@@ -42,12 +50,43 @@ class Xbox {
     this.socket.end()
     if (this.xbdm.consoles.has(this.runtimeId)) this.xbdm.consoles.delete(this.runtimeId)
   }
+
+  private loadHandlers(): void {
+    for (const x of defaultHandlers) {
+      const handler = new x(this)
+      this.handlers.set(handler.name, handler)
+    }
+  }
+
+  public async executeCommand(command: string): Promise<CommandResponse>
+  public async executeCommand(command: string, callback: (data: CommandResponse) => void): Promise<void>
+  public async executeCommand(command: string, callback?: (data: CommandResponse) => void): Promise<CommandResponse | void> {
+    return new Promise((result) => {
+      const handler = this.handlers.get('CommandsHandler') as CommandsHandler
+      handler.executeCommand(command, (data) => {
+        const statusCode = parseInt(data.toString('utf8').substring(0, 3))
+        const message = data.toString('utf8').slice(0, -2).slice(5)
+        const format: CommandResponse = {
+          statusCode,
+          message,
+        }
+
+        if (callback) {
+          return callback(format)
+        } else {
+          return result(format)
+        }
+      })
+    })
+  }
+
+  public async xNotify(message: string): Promise<CommandResponse> {
+    const command = `consolefeatures ver=2 type=12 params="A\\0\\A\\2\\2/${message.length}\\${Buffer.from(message, 'utf-8').toString('hex')}\\1\\0\\"`
+    const data = await this.executeCommand(command)
+    
+    return data
+  }
 }
-  
-//   public xNotify(message: string): void {
-//     const command = `consolefeatures ver=2 type=12 params="A\\0\\A\\2\\2/${message.length}\\${Buffer.from(message, 'utf-8').toString('hex')}\\1\\0\\"`
-//     this.sendCommand(command, () => {})
-//   }
 
 export {
   Xbox,

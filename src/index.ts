@@ -30,12 +30,11 @@ const xd = new xbdm()
 const xbox = xd.connect("192.168.1.118", (connected) => {
   if (!connected) return
   // xbox.xNotify("Hello World!!!!")
-  xbox.commands.executeCommand('getconsoleid', (data) => {
-    console.log(data)
-  })
-  setTimeout((res) => {
-    xbox.commands.executeCommand('getconsoleid', (data) => {
+  xbox.once('Connected', () => {
+    console.log('Connected to xbox')
+    xbox.xNotify('Hello World!')
+    xbox.executeCommand('getconsoleid', (data) => {
       console.log(data)
     })
-  }, 10000)
+  })
 })

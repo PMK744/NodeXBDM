@@ -1,4 +1,4 @@
 export interface CommandResponse {
-  err: boolean
-  data: string
+  statusCode: number
+  message: string
 }
