@@ -33,7 +33,7 @@ const xbox = xd.connect("192.168.1.118", (connected) => {
   xbox.once('Connected', () => {
     console.log('Connected to xbox')
     xbox.xNotify('Hello World!')
-    xbox.executeCommand('getconsoleid', (data) => {
+    xbox.executeCommand('magicboot', (data) => {
       console.log(data)
     })
   })

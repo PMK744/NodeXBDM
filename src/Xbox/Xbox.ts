@@ -82,9 +82,17 @@ class Xbox extends EventEmitter {
 
   public async xNotify(message: string): Promise<CommandResponse> {
     const command = `consolefeatures ver=2 type=12 params="A\\0\\A\\2\\2/${message.length}\\${Buffer.from(message, 'utf-8').toString('hex')}\\1\\0\\"`
-    const data = await this.executeCommand(command)
-    
-    return data
+    return await this.executeCommand(command)
+  }
+
+  public async getMemory(address: number, length: number): Promise<CommandResponse> {
+    const command = `getmem addr=${address} length=${length}`
+    return await this.executeCommand(command)
+  }
+
+  public async setMemory(address: number, data: any): Promise<CommandResponse> {
+    const command = `setmem addr=${address} data=${data}`
+    return await this.executeCommand(command)
   }
 }
 
