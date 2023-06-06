@@ -7,14 +7,16 @@ class xbdm {
     this.consoles = new Map<string, Xbox>()
   }
 
-  public connect(ip = 'jtag', callback?: (connceted: boolean) => void): Xbox {
+  public connect(ip = 'jtag', callback?: (connceted: undefined | Xbox) => void): Xbox {
     const console = new Xbox(this, ip)
     console.connect((connected) => {
       if (connected) {
         this.consoles.set(console.runtimeId, console)
-        if (callback) return callback(true)
+        console.once('Connected', (xbox) => {
+          if (callback) return callback(xbox)
+        })
       } else {
-        if (callback) return callback(false)
+        if (callback) return callback(undefined)
       }
     })
 
@@ -25,16 +27,3 @@ class xbdm {
 export {
   xbdm,
 }
-
-const xd = new xbdm()
-const xbox = xd.connect("192.168.1.118", (connected) => {
-  if (!connected) return
-  // xbox.xNotify("Hello World!!!!")
-  xbox.once('Connected', () => {
-    console.log('Connected to xbox')
-    xbox.xNotify('Hello World!')
-    xbox.executeCommand('magicboot', (data) => {
-      console.log(data)
-    })
-  })
-})

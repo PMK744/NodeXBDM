@@ -1,0 +1,203 @@
+using System;
+using System.Collections.Generic;
+using System.ComponentModel;
+using System.Globalization;
+using System.IO;
+using System.Text;
+using System.Threading;
+					
+public static class Program
+{
+	public static void Main()
+	{
+		CallArgs(true, 0, typeof(void), null, 0, uint.Parse("8E53588", System.Globalization.NumberStyles.HexNumber), 0, new object[] { 0, 0, 0, 0 });
+		uint.Parse("8E53588", NumberStyles.HexNumber);
+	}
+	
+		        public static string ToHexString(this string String)//help it depend on it's own
+        {
+            string str = string.Empty;
+            string str1 = String;
+            for (int i = 0; i < str1.Length; i++)
+            {
+                byte num = (byte)str1[i];
+                str = string.Concat(str, num.ToString("X2"));
+            }
+            return str;
+        }
+	
+	        public static int UIntToInt(uint Value) =>
+    BitConverter.ToInt32(BitConverter.GetBytes(Value), 0);
+
+	        internal static ulong ConvertToUInt64(object o)
+        {
+            if (o is bool)
+            {
+                if ((bool)o)
+                {
+                    return 1;
+                }
+                return 0;
+            }
+            if (o is byte)
+            {
+                return (byte)o;
+            }
+            if (o is short)
+            {
+                return (ulong)((short)o);
+            }
+            if (o is int)
+            {
+                return (ulong)(int)o;
+            }
+            if (o is long)
+            {
+                return (ulong)o;
+            }
+            if (o is ushort)
+            {
+                return (ushort)o;
+            }
+            if (o is uint)
+            {
+                return (uint)o;
+            }
+            if (o is ulong)
+            {
+                return (ulong)o;
+            }
+            if (o is float)
+            {
+                return (ulong)BitConverter.DoubleToInt64Bits((float)o);
+            }
+            if (!(o is double))
+            {
+                return 0;
+            }
+            return (ulong)BitConverter.DoubleToInt64Bits((double)o);
+        }
+	
+	
+	
+        public static byte[] ValueToBytes(byte data) =>
+            new byte[] { data };
+	
+	        public static byte[] IntArrayToByte(int[] iArray)
+        {
+            byte[] bytes = new byte[iArray.Length * 4];
+            int num = 0;
+            int num1 = 0;
+            while (num < iArray.Length)
+            {
+                for (int i = 0; i < 4; i++)
+                {
+                    bytes[num1 + i] = BitConverter.GetBytes(iArray[num])[i];
+                }
+                num++;
+                num1 += 4;
+            }
+            return bytes;
+        }
+	
+	public static void CallArgs(bool SystemThread, uint Type, Type t, string module, int ordinal, uint Address, uint ArraySize, params object[] Arguments) {
+            uint Int = 1;
+            uint Float = 3;
+            uint ByteArray = 7;
+            uint Uint64 = 8;
+		
+		    object[] objArray1 = new object[13];
+            objArray1[0] = "consolefeatures ver=";
+            objArray1[1] = 2;
+            objArray1[2] = " type=";
+            objArray1[3] = Type;
+            objArray1[4] = SystemThread ? " system" : "";
+            object[] objArray2 = objArray1;
+            string str1;
+            if (module == null)
+                str1 = "";
+            else
+                str1 = " module=\"" + module + "\" ord=" + ordinal;
+            objArray2[5] = str1;
+            objArray1[6] = " as=";
+            objArray1[7] = ArraySize;
+            objArray1[8] = " params=\"A\\";
+            objArray1[9] = Address.ToString("X");
+            objArray1[10] = "\\A\\";
+            objArray1[11] = Arguments.Length;
+            objArray1[12] = "\\";
+            string str2 = string.Concat(objArray1);
+		            if (Arguments.Length > 37)
+                throw new Exception("Can not use more than 37 paramaters in a call");
+            foreach (object o in Arguments)
+            {
+                bool flag1 = false;
+                if (o is uint num)
+                {
+
+                    str2 = str2 + Int + "\\" + UIntToInt(num) + "\\";
+                    flag1 = true;
+                }
+                if (o is int || o is bool || o is byte)
+                {
+                    if (o is bool flag)
+                        str2 = str2 + Int + "/" + System.Convert.ToInt32(flag) + "\\";
+                    else
+                        str2 = str2 + Int + "\\" + (o is byte ? System.Convert.ToByte(o).ToString() : System.Convert.ToInt32(o).ToString()) + "\\";
+                    flag1 = true;
+                }
+                else if (o is int[] || o is uint[])
+                {
+                    byte[] numArray = IntArrayToByte((int[])o);
+                    string str3 = str2 + ByteArray.ToString() + "/" + numArray.Length + "\\";
+                    for (int index = 0; index < numArray.Length; ++index)
+                        str3 += numArray[index].ToString("X2");
+                    str2 = str3 + "\\";
+                    flag1 = true;
+                }
+                else if (o is string)
+                {
+                    string str3 = (string)o;
+                    str2 = str2 + ByteArray.ToString() + "/" + str3.Length + "\\" + ((string)o).ToHexString() + "\\";
+                    flag1 = true;
+                }
+                else if (o is double)
+                {
+                    str2 = str2 + Float.ToString() + "\\" + o.ToString() + "\\";
+                    flag1 = true;
+                }
+                else if (o is float)
+                {
+                    str2 = str2 + Float.ToString() + "\\" + o.ToString() + "\\";
+                    flag1 = true;
+                }
+                else if (o is float[])
+                {
+                    float[] numArray = (float[])o;
+                    string str3 = str2 + ByteArray.ToString() + "/" + (numArray.Length * 4).ToString() + "\\";
+                    for (int index1 = 0; index1 < numArray.Length; ++index1)
+                    {
+                        byte[] bytes = BitConverter.GetBytes(numArray[index1]);
+                        Array.Reverse(bytes);
+                        for (int index2 = 0; index2 < 4; ++index2)
+                            str3 += bytes[index2].ToString("X2");
+                    }
+                    str2 = str3 + "\\";
+                    flag1 = true;
+                }
+                else if (o is byte[])
+                {
+                    byte[] numArray = (byte[])o;
+                    string str3 = str2 + ByteArray.ToString() + "/" + numArray.Length + "\\";
+                    for (int index = 0; index < numArray.Length; ++index)
+                        str3 += numArray[index].ToString("X2");
+                    str2 = str3 + "\\";
+                    flag1 = true;
+                }
+                if (!flag1)
+                    str2 = str2 + Uint64.ToString() + "\\" + ConvertToUInt64(o).ToString() + "\\";
+            }
+            string Command = str2 + "\"";
+			Console.WriteLine(Command);
+	}
+}

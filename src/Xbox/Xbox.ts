@@ -1,12 +1,17 @@
 import type { xbdm } from '../index'
 import type { CommandsHandler } from './handlers/Commands'
-import type { CommandResponse } from '../types'
+import type {
+  CommandResponse,
+} from '../types'
 
 import { Socket } from 'net'
 import { EventEmitter } from 'events'
-import { genUuid } from '../utils'
 import AbstractHandler from './handlers/AbstractHandler'
 import { defaultHandlers } from './handlers'
+import {
+  genUuid,
+  stringToHex,
+} from '../utils'
 
 class Xbox extends EventEmitter {
   public readonly socket: Socket
@@ -27,22 +32,25 @@ class Xbox extends EventEmitter {
   }
 
   public connect(callback: (connected?: boolean) => void): void {
-      this.socket.connect({
-        host: this.ip,
-        port: 730,
-      }, (data?) => {
-        if (data === undefined) {
-          this.socket.once('data', () => {
-            this.loadHandlers()
-            this.emit('Connected')
-          })
-        }
+    this.socket.once('error', (err) => {
+      const code = (err as any)?.code
+      if (code === "ECONNREFUSED") return callback(false)
+    })
+    this.socket.connect({
+      host: this.ip,
+      port: 730,
+    }, (data?) => {
+      if (data === undefined) {
+        this.socket.once('data', () => {
+          this.loadHandlers()
+          this.emit('Connected', this)
+        })
+      }
+      if (data === undefined && callback) return callback(true)
 
-        if (data === undefined && callback) return callback(true)
-  
-        if (callback) return callback(false)
-      })
-      if (!this.xbdm.consoles.has(this.runtimeId)) this.xbdm.consoles.set(this.runtimeId, this)
+      if (callback) return callback(false)
+    })
+    if (!this.xbdm.consoles.has(this.runtimeId)) this.xbdm.consoles.set(this.runtimeId, this)
   }
 
   public disconnect(): void {
@@ -93,6 +101,69 @@ class Xbox extends EventEmitter {
   public async setMemory(address: number, data: any): Promise<CommandResponse> {
     const command = `setmem addr=${address} data=${data}`
     return await this.executeCommand(command)
+  }
+
+  public async getCPUKey(): Promise<string> {
+    const command = "consolefeatures ver=2 type=10 params=\"A\\0\\A\\0\\\""
+    const result = await this.executeCommand(command)
+
+    return result.message
+  }
+
+  // 0 = off
+  // 128 = green
+  // 8 = red
+  // 136 = orange
+  public async setLEDs(top_left: number, top_right: number, bottom_left: number, bottom_right: number): Promise<CommandResponse> {
+    const command = `consolefeatures ver=2 type=14 params=\"A\\0\\A\\4\\1\\${top_left}\\1\\${top_right}\\1\\${bottom_left}\\1\\${bottom_right}\\\"`
+    return await this.executeCommand(command)
+  }
+
+  public async resolveFunction(module: string, ordinal: number): Promise<number> {
+    const command = "consolefeatures ver=" + 2 +
+      " type=9 params=\"A\\0\\A\\2\\" + 2 + "/" +
+      module.length + "\\" + stringToHex(module) + "\\" +
+      1 + "\\" + ordinal + "\\\"";
+    const res = await this.executeCommand(command)
+    const address = parseInt(res.message, 16)
+
+    return address
+  }
+
+  public callVoidByAddress(address: number, paramaters: (string | number | boolean)[]): void {
+    this.callArgs(true, 0, undefined, 0, address, 0, false, paramaters)
+  }
+
+  public callVoidByModule(module: string, ordinal: number, paramaters: (string | number | boolean)[]): void {
+    this.callArgs(true, 0, module, ordinal, 0, 0, false, paramaters)
+  }
+
+  // TODO: Add return values
+  private callArgs(thread: boolean, type: number, module: string | number, ordinal: number | string, address: number, arraySize: number, vm: boolean, paramaters: any[]): void {
+    const hexed = []
+    for (const entry of paramaters) {
+      if (isNaN(entry as any)) {
+        hexed.push(`7/${(entry as string).length}\\${stringToHex(entry as string)}\\`)
+      } else if ((entry as any) === true || (entry as any) === false) {
+        switch (entry as boolean) {
+          case true:
+            hexed.push('1/\\1\\')
+            break
+          case false:
+            hexed.push('1/\\0\\')
+            break
+        }
+      } else {
+        hexed.push(`1\\${entry}\\`)
+      }
+    }
+    let commandData = `${hexed.join('')}"`
+    const command = "consolefeatures ver=" + 2 + " type=" + type + (thread ? " system" : "") +
+      (module != undefined ? " module=\"" + module + "\" ord=" + ordinal : "") +
+      (vm ? " VM" : "") +
+      " as=" + arraySize + " params=\"A\\" + address.toString(16) + "\\A\\" + paramaters.length + "\\" + commandData
+
+    this.executeCommand(command)
   }
 }
 
